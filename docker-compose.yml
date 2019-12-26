@@ -10,7 +10,6 @@ services:
   enb:
     build: ./
     container_name: enbzmq
-    ipc: shareable
     cap_add:
       - SYS_NICE
     networks:
@@ -32,7 +31,6 @@ services:
   ue:
     container_name: uezmq
     build: ./
-    ipc: "container:enbzmq"
     cap_add:
       - NET_ADMIN
       - SYS_NICE

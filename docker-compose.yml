@@ -1,0 +1,51 @@
+version: '2'
+networks:
+    s1c:
+      external: true
+    s1u:
+      external: true
+    docker-open5gs_db:
+      external: true
+services:
+  enb:
+    build: ./
+    container_name: enbzmq
+    ipc: shareable
+    cap_add:
+      - SYS_NICE
+    networks:
+      s1c:
+        ipv4_address: 10.15.16.9
+      s1u: 
+        ipv4_address: 10.15.17.9
+      docker-open5gs_db:
+        ipv4_address: 192.168.50.100
+    volumes:
+      - ./run_enb.sh:/root/run_enb.sh
+      - ./enbfake.conf:/config/enbfake.conf
+      - ./sibfake.conf:/config/sibfake.conf
+
+    entrypoint:
+      - "/bin/sh" 
+      - "/root/run_enb.sh"
+
+  ue:
+    container_name: uezmq
+    build: ./
+    ipc: "container:enbzmq"
+    cap_add:
+      - NET_ADMIN
+      - SYS_NICE
+    networks:
+      docker-open5gs_db:
+        ipv4_address: 192.168.50.101
+    devices:
+      - /dev/net/tun
+    depends_on:
+      - enb
+    volumes:
+      - ./run_ue.sh:/root/run_ue.sh
+      - ./uefake.conf:/config/uefake.conf
+    entrypoint:
+      - /bin/sh
+      - /root/run_ue.sh

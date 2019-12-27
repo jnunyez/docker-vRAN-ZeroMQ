@@ -12,6 +12,7 @@ networks:
 services:
   enb:
     build: ./
+    image: srslte:latest
     container_name: enbzmq
     cap_add:
       - SYS_NICE
@@ -33,6 +34,7 @@ services:
   ue:
     container_name: uezmq
     build: ./
+    image: srslte:latest
     cap_add:
       - NET_ADMIN
       - SYS_NICE

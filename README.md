@@ -237,7 +237,7 @@ Network attach successful. IP: 45.45.0.9
 Ping to P-GW, we can observe is slighly higher with ZeroMQ than using sharedmemory:
 
 ```
-ping 45.45.0.1
+docker exec -it uezmq bash -c "ping 45.45.0.1"
 PING 45.45.0.1 (45.45.0.1) 56(84) bytes of data.
 64 bytes from 45.45.0.1: icmp_seq=1 ttl=64 time=48.9 ms
 64 bytes from 45.45.0.1: icmp_seq=2 ttl=64 time=54.1 ms

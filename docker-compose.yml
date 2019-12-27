@@ -4,8 +4,11 @@ networks:
       external: true
     s1u:
       external: true
-    docker-open5gs_db:
-      external: true
+    rfemu:
+      ipam:
+        driver: default
+        config:
+        - subnet: "192.168.51.0/24" 
 services:
   enb:
     build: ./
@@ -17,13 +20,12 @@ services:
         ipv4_address: 10.15.16.9
       s1u: 
         ipv4_address: 10.15.17.9
-      docker-open5gs_db:
-        ipv4_address: 192.168.50.100
+      rfemu:
+        ipv4_address: 192.168.51.100
     volumes:
       - ./run_enb.sh:/root/run_enb.sh
-      - ./config/enbfake.conf:/config/enbfake.conf
-      - ./config/sibfake.conf:/config/sibfake.conf
-
+      - ./config:/config
+     
     entrypoint:
       - "/bin/sh" 
       - "/root/run_enb.sh"
@@ -35,15 +37,15 @@ services:
       - NET_ADMIN
       - SYS_NICE
     networks:
-      docker-open5gs_db:
-        ipv4_address: 192.168.50.101
+      rfemu:
+        ipv4_address: 192.168.51.101
     devices:
       - /dev/net/tun
     depends_on:
       - enb
     volumes:
       - ./run_ue.sh:/root/run_ue.sh
-      - ./config/uefake.conf:/config/uefake.conf
+      - ./config:/config
     entrypoint:
       - /bin/sh
       - /root/run_ue.sh

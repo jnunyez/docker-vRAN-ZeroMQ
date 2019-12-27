@@ -1,18 +1,20 @@
 # docker-vran using a No-RF driver
 
-A repo with a ue+enodeb in two separate containers configured without radio interface using ZeroMQ as baseband transport layer.  Currently tested using srsLTE 19.09 and ubuntu 18.04 as base container
+This repo package a srsUE and an srsENB release in two separate containers (see srsLTE repo https://github.com/srsLTE/srsLTE). Instead of using over-the-air transmission the transport is configured without radio interface using a virtual network and ZeroMQ to exchange RAN messages as emulated baseband transport layer.  
 
-## ZeroMQ Installation
+## Building srsLTE with ZeroMQ 
 
-ZeroMQ has different modes of operation, srsLTE uses Request/Reply mode. The ZMQ module has two entities, a transmitter as a repeater and as a requester. The receiver will asynchronously send requests for data to the transmitter and this will reply with base-band samples. Consequently, the receiver will store the received data in a buffer, waiting to be read. Both modules shall operate at the same base rate so their bandwidth expectations can be satisfied
+ZeroMQ has different modes of operation, srsLTE uses Request/Reply mode. The ZMQ module has two entities, a transmitter as a repeater and as a requester. The receiver will asynchronously send requests for data to the transmitter and this will reply with base-band samples. Consequently, the receiver will store the received data in a buffer, waiting to be read. Both modules shall operate at the same base rate so their bandwidth expectations can be satisfied.
 
-A few notes on the to the usual Dockerfile to build srsLTE. The steps below are already present the `Dockerfile` provided in this repo. First thing installing ZeroMQ library using apt-get or using the sources. I've used apt-get:
+### Installing ZeroMQ support for srsLTE
+
+Here I added a few notes on the to the usual Dockerfile to build srsLTE. The steps below are already present the `Dockerfile` provided in this repo. First thing installing ZeroMQ library using apt-get or using the sources. I've used apt-get in an Ubuntu 18.04 container:
 
 ```
 apt-get install libzmq3-dev
 ```
 
-After this it is necessary to recompile the srsLTE sources.
+After this it is necessary to compile the srsLTE sources.
 
 ```
 git clone https://github.com/srsLTE/srsLTE.git cd srsLTE
@@ -38,9 +40,9 @@ make
 make install
 ```
 
-## Configuring the venodeB
+## Configuring the vENODEB
 
-Some notes here on the modification of the defualt config files provided by srsLTE:
+Some notes here on the modification of the default config files provided by srsLTE:
 
 ### ZeroMQ
 
@@ -51,9 +53,9 @@ device_name = zmq
 device_args = "rx_port=tcp://192.168.51.101:5555,tx_port=tcp://*:5554,id=enb,base_srate=1.92e6"
 ```
 
-where 192.168.50.101 is the IP address of the UE.In this example I used a network created by docker using default driver to communicate ZeroMQ messages between UE and eNodeB.
+where 192.168.1.101 is the IP address of the UE. In this example I used a network created by docker using default bridge driver to exchange ZeroMQ messages between UE and eNodeB.
 
-Only managed to make it work with 6 resource blocks (to be further investigated):
+I only managed to make it work with 6 resource blocks (to be further investigated):
 
 ```
 [enb]
@@ -63,15 +65,18 @@ n_prb = 6
 
 
 ### Radio resource configuration parameters
- Some of the files we haven't modified whereas files with fake on it have been modified. 
+Some of the files we haven't modified whereas files with fake on it have been modified. 
 
 ```
 rr.conf:  contains radio resource configuration
 drb.conf: data bearers configuration
-sibfake.conf: SIB configuration 
+sibfake.conf: SIB configuration modified
+sibmsbfn.conf: SIB MSBFN configuration
+enbfake.conf: enb config modified
+uefake.conf: ue config modified
 ```
 
-Played with the parameter related to RF. This setting must be applied in both the eNodeB and the UE.
+Tuned manually the transmission time delay (counted in samples) in the RF configuration part.This setting must be applied in both the eNodeB and the UE.
 
 ```
 [rf]
@@ -79,15 +84,15 @@ Played with the parameter related to RF. This setting must be applied in both th
 time_adv_nsamples = 0
 ```
 
-Without these senting there are problems at teh RACH when establishing the RRC connection setup. T300 timer expiration.
+Without this modification there are problems at teh RACH when establishing the RRC connection setup (e.g., RRC can't be establisthed due to T300 timer expiration cause of some discarded frame in buffer).
 
-### Network level configuration
+### vENODEB networks
 
 enb.mme_addr : Ip address of the MME  
 enb.gtp_bind_addr : Ip address assined to the eNodeB to connect with S-GW
 enb.s1c_bind_addr : Ip addres assigned to eNodeB to connect with the MME
 
-Instead of using over-the air medium we use a docker network based on default bridge driver where the vUE is in a container and the veNodeB is in another container:
+Instead of using over-the air medium we use a docker network based on default bridge driver `rfemu` is the name of the network in `docker-compose.yml` of this repo where the vUE is in a container and the veNodeB is in another container:
                                                                   
                                  ZeroMQ Messages                   
               ┌──────────┐                             ┌──────────┐
@@ -110,7 +115,7 @@ ue_timers_and_constants = {
 n311 = 10; };
 ```
 
-Also because of the `n_prb` setting some changes are required in `sib.conf` file parameter `prach_freq_offset`. In `prach_cnfg` block:
+Also, because of the `n_prb` setting some changes are required in `sib.conf` file parameter `prach_freq_offset`. In `prach_cnfg` block:
 
 ```
  prach_cnfg =
@@ -135,7 +140,7 @@ device_name = zmq
 device_args = "rx_port=tcp://192.168.51.100:5554,tx_port=tcp://*:5555,id=ue,base_srate=1.92e6"
 ```
 
-where 192.168.50.100 is the IP address of the eNodeB used for RAN downlink messages through ZMQ bus.
+where 192.168.51.100 is the IP address of the eNodeB used for RAN downlink messages through ZMQ bus.
 
 At the RF level, it is important to tune manually the parameter related to the number of advertised samples RF with the same value as the one declared in the eNodeB.
 
@@ -147,6 +152,10 @@ time_adv_nsamples = 0
 
 Without this setting I observed problems at the RACH when establishing the RRC connection setup (T300 timer expiration).
 
+### UE network
+
+To establish the emulated transport just attach port of network `rfemu` as specified in the `docker-compose.yml`.
+
 ## Run vUE+veNodeB
 
 To run the UE and eNodeB in two containers in the same baremetal/VM machine:
@@ -156,12 +165,10 @@ docker-compose -f docker-compose.yml build --no-cache
 docker-compose up -d
 ```
 
-
-## Debugging
-
+Tested using srsLTE 19.09 sw release and ubuntu 18.04 as base container.
 Once containers are running you can start checking the logs:
 
-### On the eNodeB:
+### vENODEB debugging:
 
 ```
 docker logs enodezmq -f
@@ -195,7 +202,7 @@ RACH:  tti=351, preamble=22, offset=0, temp_crnti=0x46
 User 0x46 connected
 ```
 
-### On the UE side:
+### vUE debugging:
 
 ```
 docker logs uezmq -f

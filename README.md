@@ -1,25 +1,24 @@
 # docker-vran using a No-RF driver
 
-A repo with a ue+enodeb in two separate containers configured without radio interface using ZeroMQ as baseband transport layer. 
-Tested using srsLTE 19.09 and ubuntu 18.04 as container
+A repo with a ue+enodeb in two separate containers configured without radio interface using ZeroMQ as baseband transport layer.  Currently tested using srsLTE 19.09 and ubuntu 18.04 as base container
 
-## ZeroMQ 
+## ZeroMQ Installation
 
 ZeroMQ has different modes of operation, srsLTE uses Request/Reply mode. The ZMQ module has two entities, a transmitter as a repeater and as a requester. The receiver will asynchronously send requests for data to the transmitter and this will reply with base-band samples. Consequently, the receiver will store the received data in a buffer, waiting to be read. Both modules shall operate at the same base rate so their bandwidth expectations can be satisfied
 
-The first thing one may try is installing ZeroMQ library using apt-get or using the sources.
+A few notes on the to the usual Dockerfile to build srsLTE. The steps below are already present the `Dockerfile` provided in this repo. First thing installing ZeroMQ library using apt-get or using the sources. I've used apt-get:
 
 ```
 apt-get install libzmq3-dev
 ```
 
-After this it is necessary to recompile all the sources.
+After this it is necessary to recompile the srsLTE sources.
 
 ```
 git clone https://github.com/srsLTE/srsLTE.git cd srsLTE
 mkdir build
 cd build
-cmake ../ make
+cmake ../ 
 ```
 
 Make sure you read ZEROMQ library is detected in the output of cmake:
@@ -32,19 +31,29 @@ Make sure you read ZEROMQ library is detected in the output of cmake:
 -- Found libZEROMQ: /usr/local/include, /usr/local/lib/libzmq.so ...
 ```
 
+If the ZeroMQ libraries are found you are good to go. Then install srsLTE as usual:
+
+```
+make
+make install
+```
 
 ## Configuring the venodeB
 
+Some notes here on the modification of the defualt config files provided by srsLTE:
+
 ### ZeroMQ
+
+We mofified the type of RF device used as front-end:
 
 ```
 device_name = zmq
 device_args = "rx_port=tcp://192.168.50.101:5555,tx_port=tcp://*:5554,id=enb,base_srate=1.92e6"
 ```
 
-where 192.168.50.101 is the IP address of the UE.
+where 192.168.50.101 is the IP address of the UE.In this example I used a network created by docker using default driver to communicate ZeroMQ messages between UE and eNodeB.
 
-Only managed to make it work with 6 resource blocks:
+Only managed to make it work with 6 resource blocks (to be further investigated):
 
 ```
 [enb]
@@ -52,11 +61,9 @@ default parameter
 n_prb = 6
 ```
 
-Also because of this setting some changes are required in sibfake.conf of parameter `prach_freq_offset`
 
 ### Radio resource configuration parameters
-
-Some of the files we haven't modified whereas files with fake on it have been modified:
+ Some of the files we haven't modified whereas files with fake on it have been modified. 
 
 ```
 rr.conf:  contains radio resource configuration
@@ -64,7 +71,7 @@ drb.conf: data bearers configuration
 sibfake.conf: SIB configuration 
 ```
 
-Played with the parameter related to RF.
+Played with the parameter related to RF. This setting must be applied in both the eNodeB and the UE.
 
 ```
 [rf]
@@ -80,11 +87,18 @@ enb.mme_addr : Ip address of the MME
 enb.gtp_bind_addr : Ip address assined to the eNodeB to connect with S-GW
 enb.s1c_bind_addr : Ip addres assigned to eNodeB to connect with the MME
 
-Instead of using RF we use a virtual docker network where the vUE is in a container and the veNodeB is in another container.
+Instead of using over-the air medium we use a docker network based on default bridge driver where the vUE is in a container and the veNodeB is in another container:
+                                                                  
+                                 ZeroMQ Messages                   
+              ┌──────────┐                             ┌──────────┐
+              │          │          ┌─────────┐        │          │
+              │   UE     │◀─────────┤ bridge  ├───────▶│   eNodeB │
+              │          │          └─────────┘        │          │
+              └──────────┘                             └──────────┘
 
 ### Configuring SIB
 
-Important to increase timers since srsLTE is not using radio timers but system timers:
+The file `sibfake.con` contains some adjustment for our emulated setting. First all timers are increased to their allowed maximum:
 
 ```
 ue_timers_and_constants = {
@@ -96,7 +110,7 @@ ue_timers_and_constants = {
 n311 = 10; };
 ```
 
-And in `prach_cnfg` block:
+Also because of the `n_prb` setting some changes are required in `sib.conf` file parameter `prach_freq_offset`. In `prach_cnfg` block:
 
 ```
  prach_cnfg =
@@ -114,19 +128,16 @@ And in `prach_cnfg` block:
 
 ## Configuring the vUE
 
-uefake.conf contains all the necessary parameters:
-
-Important parameters here are:
+In the file `uefake.conf` there are some modifications of the by-default UE parameters. Parameters changed here are:
 
 ```
 device_name = zmq
 device_args = "rx_port=tcp://192.168.50.100:5554,tx_port=tcp://*:5555,id=ue,base_srate=1.92e6"
 ```
 
-
 where 192.168.50.100 is the IP address of the eNodeB used for RAN downlink messages through ZMQ bus.
 
-Played with the parameter related to RF.
+At the RF level, it is important to tune manually the parameter related to the number of advertised samples RF with the same value as the one declared in the eNodeB.
 
 ```
 [rf]
@@ -134,18 +145,57 @@ Played with the parameter related to RF.
 time_adv_nsamples = 0
 ```
 
-Without these senting there are problems at teh RACH when establishing the RRC connection setup.
+Without this setting I observed problems at the RACH when establishing the RRC connection setup (T300 timer expiration).
 
-After attachment you have to manually add default route:
+## Run vUE+veNodeB
+
+To run the UE and eNodeB in two containers in the same baremetal/VM machine:
 
 ```
-docekr exec -it ue bash -c "ip r a default dev tun_srsue"
-docker exec -it ue bash -c "ping 8.8.8.8"
+docker-compose -f docker-compose.yml build --no-cache
+docker-compose up -d
 ```
+
 
 ## Debugging
 
-On the UE:
+Once containers are running you can start checking the logs:
+
+### On the eNodeB:
+
+```
+docker logs enodezmq -f
+linux; GNU C++ version 7.3.0; Boost_106501; UHD_003.010.003.000-0-unknown
+
+
+Built in Release mode using commit 0e89fa9f on branch master.
+
+---  Software Radio Systems LTE eNodeB  ---
+
+Reading configuration file /config/enbfake.conf...
+Opening 1 RF devices with 1 RF channels...
+Using base rate=1.92e6"
+Using rx_port=tcp://192.168.50.101:5555
+Using tx_port=tcp://*:5554
+Using ID=enb
+Current sample rate is 1.92 MHz with a base rate of 1.92 MHz (x1 decimation)
+
+Warning burst preamble is not calibrated for device zmq. Set a value manually
+
+Setting frequency: DL=2685.0 Mhz, UL=2565.0 MHz
+Setting Sampling frequency 1.92 MHz
+Current sample rate is 1.92 MHz with a base rate of 1.92 MHz (x1 decimation)
+Current sample rate is 1.92 MHz with a base rate of 1.92 MHz (x1 decimation)
+Setting manual TX/RX offset to 0 samples
+
+==== eNodeB started ===
+Type <t> to view trace
+Closing stdin thread.
+RACH:  tti=351, preamble=22, offset=0, temp_crnti=0x46
+User 0x46 connected
+```
+
+### On the UE side:
 
 ```
 docker logs uezmq -f
@@ -187,7 +237,7 @@ Network attach successful. IP: 45.45.0.9
 Ping to P-GW, we can observe is slighly higher with ZeroMQ than using sharedmemory:
 
 ```
-ing 45.45.0.1
+ping 45.45.0.1
 PING 45.45.0.1 (45.45.0.1) 56(84) bytes of data.
 64 bytes from 45.45.0.1: icmp_seq=1 ttl=64 time=48.9 ms
 64 bytes from 45.45.0.1: icmp_seq=2 ttl=64 time=54.1 ms
@@ -198,43 +248,23 @@ PING 45.45.0.1 (45.45.0.1) 56(84) bytes of data.
 64 bytes from 45.45.0.1: icmp_seq=7 ttl=64 time=56.4 ms
 ```
 
-On the eNodeB:
+After attachment note that you have to manually add a default route in the UE to reach the Internet:
 
 ```
-docker logs enodezmq -f
-linux; GNU C++ version 7.3.0; Boost_106501; UHD_003.010.003.000-0-unknown
-
-
-Built in Release mode using commit 0e89fa9f on branch master.
-
----  Software Radio Systems LTE eNodeB  ---
-
-Reading configuration file /config/enbfake.conf...
-Opening 1 RF devices with 1 RF channels...
-Using base rate=1.92e6"
-Using rx_port=tcp://192.168.50.101:5555
-Using tx_port=tcp://*:5554
-Using ID=enb
-Current sample rate is 1.92 MHz with a base rate of 1.92 MHz (x1 decimation)
-
-Warning burst preamble is not calibrated for device zmq. Set a value manually
-
-Setting frequency: DL=2685.0 Mhz, UL=2565.0 MHz
-Setting Sampling frequency 1.92 MHz
-Current sample rate is 1.92 MHz with a base rate of 1.92 MHz (x1 decimation)
-Current sample rate is 1.92 MHz with a base rate of 1.92 MHz (x1 decimation)
-Setting manual TX/RX offset to 0 samples
-
-==== eNodeB started ===
-Type <t> to view trace
-Closing stdin thread.
-RACH:  tti=351, preamble=22, offset=0, temp_crnti=0x46
-User 0x46 connected
+docker exec -it uezmr bash -c "ip r d default"
+docker exec -it uezmr bash -c "ip r a default dev tun_srsue"
+docker exec -it uezmr bash -c "ping 8.8.8.8"
+PING 8.8.8.8 (8.8.8.8) 56(84) bytes of data.
+64 bytes from 8.8.8.8: icmp_seq=1 ttl=52 time=69.4 ms
+64 bytes from 8.8.8.8: icmp_seq=2 ttl=52 time=59.7 ms
+64 bytes from 8.8.8.8: icmp_seq=3 ttl=52 time=75.3 ms
+64 bytes from 8.8.8.8: icmp_seq=4 ttl=52 time=60.8 ms
 ```
 
-## Caveats
 
-- Stabilization utilize more resource blocks.
-- Scalability of this solution? Increase number of UEs.
-- Tested only against open5gs core.
+## Caveats//ToDo
+
+- Currently UE and eNodeB in the same machine. Put them in different machines.
+- Try with more resource blocks (n_prb=6).
+- Increase the number of UEs.
 

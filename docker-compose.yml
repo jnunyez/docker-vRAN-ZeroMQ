@@ -21,8 +21,8 @@ services:
         ipv4_address: 192.168.50.100
     volumes:
       - ./run_enb.sh:/root/run_enb.sh
-      - ./enbfake.conf:/config/enbfake.conf
-      - ./sibfake.conf:/config/sibfake.conf
+      - ./config/enbfake.conf:/config/enbfake.conf
+      - ./config/sibfake.conf:/config/sibfake.conf
 
     entrypoint:
       - "/bin/sh" 
@@ -43,7 +43,7 @@ services:
       - enb
     volumes:
       - ./run_ue.sh:/root/run_ue.sh
-      - ./uefake.conf:/config/uefake.conf
+      - ./config/uefake.conf:/config/uefake.conf
     entrypoint:
       - /bin/sh
       - /root/run_ue.sh

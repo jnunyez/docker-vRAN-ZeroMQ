@@ -48,7 +48,7 @@ We mofified the type of RF device used as front-end:
 
 ```
 device_name = zmq
-device_args = "rx_port=tcp://192.168.50.101:5555,tx_port=tcp://*:5554,id=enb,base_srate=1.92e6"
+device_args = "rx_port=tcp://192.168.51.101:5555,tx_port=tcp://*:5554,id=enb,base_srate=1.92e6"
 ```
 
 where 192.168.50.101 is the IP address of the UE.In this example I used a network created by docker using default driver to communicate ZeroMQ messages between UE and eNodeB.
@@ -132,7 +132,7 @@ In the file `uefake.conf` there are some modifications of the by-default UE para
 
 ```
 device_name = zmq
-device_args = "rx_port=tcp://192.168.50.100:5554,tx_port=tcp://*:5555,id=ue,base_srate=1.92e6"
+device_args = "rx_port=tcp://192.168.51.100:5554,tx_port=tcp://*:5555,id=ue,base_srate=1.92e6"
 ```
 
 where 192.168.50.100 is the IP address of the eNodeB used for RAN downlink messages through ZMQ bus.
@@ -248,7 +248,7 @@ PING 45.45.0.1 (45.45.0.1) 56(84) bytes of data.
 64 bytes from 45.45.0.1: icmp_seq=7 ttl=64 time=56.4 ms
 ```
 
-After attachment note that you have to manually add a default route in the UE to reach the Internet:
+After attachment note that you have to manually add a default route and deleting default route in the UE to reach the Internet through `tun_srsue`:
 
 ```
 docker exec -it uezmr bash -c "ip r d default"

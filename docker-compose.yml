@@ -46,8 +46,8 @@ services:
     depends_on:
       - enb
     volumes:
-      - ./run_ue.sh:/root/run_ue.sh
+      - ./run_ue_ping.sh:/root/run_ue_ping.sh
       - ./config:/config
     entrypoint:
       - /bin/sh
-      - /root/run_ue.sh
+      - /root/run_ue_ping.sh

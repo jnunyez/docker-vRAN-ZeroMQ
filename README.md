@@ -202,7 +202,7 @@ RACH:  tti=351, preamble=22, offset=0, temp_crnti=0x46
 User 0x46 connected
 ```
 
-### vUE debugging:
+### vUE (using run_ue.sh) debugging:
 
 ```
 docker logs uezmq -f
@@ -266,6 +266,70 @@ PING 8.8.8.8 (8.8.8.8) 56(84) bytes of data.
 64 bytes from 8.8.8.8: icmp_seq=2 ttl=52 time=59.7 ms
 64 bytes from 8.8.8.8: icmp_seq=3 ttl=52 time=75.3 ms
 64 bytes from 8.8.8.8: icmp_seq=4 ttl=52 time=60.8 ms
+```
+
+### vUE (run_ue_ping.sh) debugging
+
+To automate the test the vUE, you need to change the routing table and wait to the tunnel interface is up and running. A dirty solution that can turn into unexpected failures is to automate this process would be to add  `sleep N`, where N is big enough hardcoded value, and hope for the tunnel interface is created. 
+
+To avoid problems, in `run_ue_ping.sh` I automated the validation of the UE by means of waiting for the tunnel interface in the UE to be up and running. The added piece of code waits till `tun_srsue` is present and in *UP* operational state. Thus, in this case after attachment you have to do nothing to test UE connectivity to P-GW and Internet (well just check the logs):
+
+```
+docker logs uezmq -f
+linux; GNU C++ version 7.3.0; Boost_106501; UHD_003.010.003.000-0-unknown
+
+Reading configuration file /config/uefake.conf...
+
+Built in Release mode using commit 06afe74b on branch master.
+
+Opening 1 RF devices with 1 RF channels...
+Using base rate=1.92e6"
+Using ID=ue
+Current sample rate is 1.92 MHz with a base rate of 1.92 MHz (x1 decimation)
+Channel 0. Using rx_port=tcp://192.168.51.100:5554
+Channel 0. Using tx_port=tcp://*:5555
+
+Warning burst preamble is not calibrated for device zmq. Set a value manually
+
+Waiting PHY to initialize ... done!
+Attaching UE...
+Closing stdin thread.
+Searching cell in DL EARFCN=3400, f_dl=2685.0 MHz, f_ul=2565.0 MHz
+Current sample rate is 1.92 MHz with a base rate of 1.92 MHz (x1 decimation)
+Current sample rate is 1.92 MHz with a base rate of 1.92 MHz (x1 decimation)
+Setting manual TX/RX offset to 0 samples
+.
+Found Cell:  Mode=FDD, PCI=1, PRB=6, Ports=1, CFO=0.0 KHz
+Current sample rate is 1.92 MHz with a base rate of 1.92 MHz (x1 decimation)
+Current sample rate is 1.92 MHz with a base rate of 1.92 MHz (x1 decimation)
+Setting manual TX/RX offset to 0 samples
+Found PLMN:  Id=00101, TAC=4660
+Random Access Transmission: seq=4, ra-rnti=0x2
+Random Access Complete.     c-rnti=0x46, ta=0
+RRC Connected
+Network attach successful. IP: 45.45.0.2
+pinging 10 times to the p-gw
+ nTp) 1/1/2020 14:56:1 TZ:0
+PING 45.45.0.1 (45.45.0.1) 56(84) bytes of data.
+64 bytes from 45.45.0.1: icmp_seq=1 ttl=64 time=35.3 ms
+64 bytes from 45.45.0.1: icmp_seq=2 ttl=64 time=52.4 ms
+64 bytes from 45.45.0.1: icmp_seq=3 ttl=64 time=42.4 ms
+64 bytes from 45.45.0.1: icmp_seq=4 ttl=64 time=57.7 ms
+64 bytes from 45.45.0.1: icmp_seq=5 ttl=64 time=65.6 ms
+64 bytes from 45.45.0.1: icmp_seq=6 ttl=64 time=44.1 ms
+64 bytes from 45.45.0.1: icmp_seq=7 ttl=64 time=58.4 ms
+64 bytes from 45.45.0.1: icmp_seq=8 ttl=64 time=53.8 ms
+64 bytes from 45.45.0.1: icmp_seq=9 ttl=64 time=64.7 ms
+64 bytes from 45.45.0.1: icmp_seq=10 ttl=64 time=56.8 ms
+
+--- 45.45.0.1 ping statistics ---
+10 packets transmitted, 10 received, 0% packet loss, time 9013ms
+rtt min/avg/max/mdev = 35.383/53.167/65.647/9.307 ms
+pinging till I die to the internet
+PING 8.8.8.8 (8.8.8.8) 56(84) bytes of data.
+64 bytes from 8.8.8.8: icmp_seq=1 ttl=51 time=64.1 ms
+64 bytes from 8.8.8.8: icmp_seq=2 ttl=51 time=71.7 ms
+64 bytes from 8.8.8.8: icmp_seq=3 ttl=51 time=65.5 ms
 ```
 
 

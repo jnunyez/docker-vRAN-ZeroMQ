@@ -338,4 +338,5 @@ PING 8.8.8.8 (8.8.8.8) 56(84) bytes of data.
 - Currently UE and eNodeB in the same machine. Put them in different machines.
 - Try with more resource blocks (n_prb=6).
 - Increase the number of UEs.
+- Note that the TAC specified in the enb is in hexadecimal format.
 

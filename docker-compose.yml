@@ -11,7 +11,7 @@ networks:
         - subnet: "192.168.51.0/24" 
 services:
   enb:
-    build: ./
+    build: ./Dockerfile_bionic
     image: srslte:latest
     container_name: enbzmq
     cap_add:

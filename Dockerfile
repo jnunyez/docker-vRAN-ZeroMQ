@@ -1,4 +1,4 @@
-FROM ubuntu:18.04
+FROM ubuntu:20.04
 MAINTAINER "Jose Nuñez <jonunyez@gmail.com>"
 ENV DEBIAN_FRONTEND noninteractive
 RUN apt-get update
@@ -9,7 +9,7 @@ RUN apt-get install --no-install-recommends -yq \
      libuhd-dev \
      uhd-host \
      libboost-program-options-dev \
-     libvolk1-dev \
+     libvolk2-dev \
      libfftw3-dev \
      libmbedtls-dev \
      libsctp-dev \
